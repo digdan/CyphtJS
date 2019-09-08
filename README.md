@@ -17,11 +17,12 @@ Example of a Public Key :
 ## Code Examples
 ```
 import cypht from 'cyphtjs';
-const keys = cypht.generateKeys();
-const encMessage = cypht.encypht('We attack at dawn', keys.publicKey);
-const decMessage = cypht.decrypt(encMessage, keys.privateKey);
-console.log('Public Key', keys.publicKey.export());
-console.log('Decyphting', encMessage,'->',decMessage);
+cypht.generateKeys().then( keys => {
+  const encMessage = cypht.encypht('We attack at dawn', keys.publicKey);
+  const decMessage = cypht.decrypt(encMessage, keys.privateKey);
+  console.log('Public Key', keys.publicKey.export());
+  console.log('Decyphting', encMessage,'->',decMessage);
+});
 ```
 
 ## Security
