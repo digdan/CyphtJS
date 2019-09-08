@@ -1,0 +1,21 @@
+{
+  "name": "cyphtjs",
+  "version": "1.0.0",
+  "description": "A cryptographic messaging library that uses no core/native libs",
+  "main": "index.js",
+  "scripts": {
+    "build": "rollup -c",
+    "test": "npm run build; node test.js"
+  },
+  "main": "build/index.js",
+  "author": "Danjelo Morgaux",
+  "license": "ISC",
+  "dependencies": {
+    "base-x": "^3.0.7",
+    "big-integer": "^1.6.44",
+    "buffer": "^5.4.2"
+  },
+  "devDependencies": {
+    "rollup": "^1.21.0"
+  }
+}
