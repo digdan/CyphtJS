@@ -5,9 +5,9 @@ import { CyphtPrivateKey, CyphtPublicKey } from './CyphtKeys';
 import baseConverter from './baseConverter';
 
 const EXPON = 65537; // Default cryptographic exponent
-const KEYSIZE = 128; //In Bytes
+const KEYSIZE = 64; //In Bytes
 const PRIMECHECK = 1; // Certainty of a prime
-const TOKENSIZE = 112; //In Bytes - Token assymetrically encryted and used for AES cipher Password
+const TOKENSIZE = 32; //In Bytes - Token assymetrically encryted and used for AES cipher Password
 
 //Psudo Random Number Generator -- in hex
 const prng = len => Array(len)

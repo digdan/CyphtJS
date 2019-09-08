@@ -1,7 +1,7 @@
 var cypht = require('./build/index');
 console.log('Generating keys');
 const started = Date.now();
-const { privateKey, publicKey } = cypht.generateKeys().then( ({ privateKey, publicKey }) => {
+cypht.generateKeys().then( ({ privateKey, publicKey }) => {
   console.log('Keys generated in', (Date.now() - started), 'ms');
   console.log('Public Key', publicKey.export());
   let message = 'We strike at dawn';
