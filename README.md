@@ -9,10 +9,10 @@ The basics is to create a key pair using the `generateKeys` function. This will 
 The library uses a different type of encoding than normal. URL Safe binary encoding was used by converting binary data to 75 url safe characters to create a base75 encoding system. Cyphted messages and exported public keys both use this base75 encoding.
 
 Example of Cypht Message : 
-`BS59U;H_q':9Tu-e@E7NFv6Qrw~efe4wl1S8nuM(gb2DfVMHlVdMG3_tZ0T0C:J(JLJ;qphcRp9D*w69fH:P~EGl1LMi'lUby-)lgL@UGo6wUEVL7TUrDDG78!e,bW4M4t0VDv408u(jcC@fIBM-arhd225*-7c@YHB.HC4;f5'g_u~gA8sF1oal3M!(y-DD@~3~17,_P'hbsrP`
+`xzj1kq:8ypvHWgrlx1-qgW6jVu_msKkvJQH~nPLZ-t2lojwwKVlA!uGZ0eyIr9bmJ6yk8WPI1nn6JF5*G.BLe_iwar8_kLs*'Evum,8oDQ7Gsk@qlh-H*JvO,y:u`
 
 Example of a Public Key : 
-`Bpxf5WN')LeL@sZKDYI5MbimgY!6ko@)V~X1n~Q4:QCzchGHeARM(i!f9rFSSTPD5RR@U!rpd93iNcPuDqVWQQsap1KA28TnXkKby,wAI4dbAXO4yzW16;-EIHPtZaI:g_UNkzBQ,VBcheP*WX~5u40GfGif5VxPb4v`
+`BXvRsE'cYQrQp3XVVh8HK5n(;*uFdqi:2Oc~4nEi7Z(j!YM,3GF'!G(63U2Rf,L)*VVAZO-1*b0H~eh-1p`
 
 ## Code Examples
 ```
