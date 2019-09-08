@@ -24,5 +24,8 @@ console.log('Public Key', keys.publicKey.export());
 console.log('Decyphting', encMessage,'->',decMessage);
 ```
 
+## Security
+The library is ment to be fast and lightweight and only provides very basic security. The keys are equiveland to 512bit RSA Encryption also known as RSA-155. A RSA-155 key was cracked in 1999 after 6 months of heavy computing on pretty advanced hardware. The concept is that the keys are crackable, but it would take a lot of computing power and time to crack a single key and is not worth it for most hackers.
+
 ## Looking forward
 There is a lot of functionality that can be put into this library. At this time I would like to keep it slim and simple as possible. No need to import/export private keys, or allow tweaking the key/token sizes.
