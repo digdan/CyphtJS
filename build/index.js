@@ -373,12 +373,16 @@ class AesCtr extends Aes {
     }
 }
 
-//import baseConverter from './baseConverter';
+//Psudo Random Number Generator -- in hex
+const prng = len => Array(len)
+  .fill()
+  .map(() => parseInt((Math.round(Math.random() * 256))).toString(16));
 
 class CyphtPublicKey {
   constructor(privateKey) {
     this.n = (typeof privateKey === 'undefined' ? null : privateKey.n);
     this.e = (typeof privateKey === 'undefined' ? 0 : privateKey.e);
+    this.options = privateKey.options;
   }
 
   crypt(x) {
@@ -396,7 +400,15 @@ class CyphtPublicKey {
 }
 
 class CyphtPrivateKey {
-  constructor() {
+  constructor( options = {}) {
+    const defaultOptions = {
+      expon: 65537,
+      keySize: 64,
+      primeCheck: 3,
+      tokenSize: 32
+    };
+    this.options = Object.assign({}, defaultOptions, options);
+    // TODO expand tokenSize based on keySize
     this.n = null; // Private & Public
     this.e = 0; // Private & Public
     this.d = null; // Private
@@ -413,8 +425,9 @@ class CyphtPrivateKey {
     }
     let xp = x.mod(this.p).modPow(this.dmp1, this.p);
     let xq = x.mod(this.q).modPow(this.dmq1, this.q);
-    while(xp.compareTo(xq) < 0)
+    while (xp.compareTo(xq) < 0) {
       xp = xp.add(this.p);
+    }
     return xp.subtract(xq).multiply(this.coeff).mod(this.p).multiply(this.q).add(xq);
   }
 
@@ -422,12 +435,53 @@ class CyphtPrivateKey {
     return new CyphtPublicKey(this);
   }
 
+  // Key generation
+  generate() {
+    return new Promise( (resolve, reject) => {
+      const qs = this.options.keySize >> 1;
+      this.e = parseInt(this.options.expon, 16);
+      const ee = new BigInteger(this.options.expon, 16);
+      for(;;) {
+        for(;;) {
+          //Populate a big int with random bytes
+          this.p = new BigInteger(prng(this.options.keySize - qs).join(''), 16);
+          while(!this.p.isProbablePrime(this.options.primeCheck)) { //Is this random number prime?
+            this.p = new BigInteger(prng(this.options.keySize - qs).join(''), 16);
+          }
+          this.p.subtract(BigInteger.one);
+          if (BigInteger.gcd(this.p, ee).compareTo(BigInteger.one) === 0 && this.p.isProbablePrime(this.options.primeCheck)) break;
+        }
+        for(;;) {
+          this.q = new BigInteger(prng(qs).join(''), 16);
+          while(!this.q.isProbablePrime(this.options.primeCheck)) {
+            this.q = new BigInteger(prng(qs).join(''), 16);
+          }
+          this.q.subtract(BigInteger.one);
+          if (BigInteger.gcd(this.q, ee).compareTo(BigInteger.one) === 0 && this.q.isProbablePrime(this.options.primeCheck)) break;
+        }
+        if (this.p.compareTo(this.q) <= 0) {
+          const t = this.p;
+          this.p = this.q;
+          this.q = t;
+        }
+        const p1 = this.p.subtract(BigInteger.one);
+        const q1 = this.q.subtract(BigInteger.one);
+        const phi = p1.multiply(q1);
+        if (BigInteger.gcd(phi, ee).compareTo(BigInteger.one) === 0) {
+          this.n = this.p.multiply(this.q);
+          this.d = ee.modInv(phi);
+          this.dmp1 = this.d.mod(p1);
+          this.dmq1 = this.d.mod(q1);
+          this.coeff = this.q.modInv(this.p);
+          break;
+        }
+      }
+      resolve(
+        true
+      );
+    });
+  }
 }
-
-//Psudo Random Number Generator -- in hex
-const prng = len => Array(len)
-  .fill()
-  .map(() => parseInt((Math.round(Math.random() * 256))).toString(16));
 
 // Turns integer into text
 const pkcs1unpad2 = (d, n) => {
@@ -492,63 +546,6 @@ const pkcs1pad2 = (s, n) => {
   return new BigInteger.fromArray(ba, 256);
 };
 
-//import baseConverter from './baseConverter';
-
-const EXPON = 65537; // Default cryptographic exponent
-const KEYSIZE = 64; //In Bytes
-const PRIMECHECK = 1; // Certainty of a prime
-const TOKENSIZE = 32; //In Bytes - Token assymetrically encryted and used for AES cipher Password
-
-// Key generation
-const generateKeys = (keySize=KEYSIZE, exponent=EXPON) => {
-  return new Promise( (resolve, reject) => {
-    const privateKey = new CyphtPrivateKey();
-    const qs = keySize >> 1;
-    privateKey.e = parseInt(exponent, 16);
-    const ee = new BigInteger(exponent, 16);
-    for(;;) {
-      for(;;) {
-        //Populate a big int with random bytes
-        privateKey.p = new BigInteger(prng(keySize - qs).join(''), 16);
-        while(!privateKey.p.isProbablePrime(PRIMECHECK)) { //Is this random number prime?
-          privateKey.p = new BigInteger(prng(keySize - qs).join(''), 16);
-        }
-        privateKey.p.subtract(BigInteger.one);
-        if (BigInteger.gcd(privateKey.p, ee).compareTo(BigInteger.one) === 0 && privateKey.p.isProbablePrime(PRIMECHECK)) break;
-      }
-      for(;;) {
-        privateKey.q = new BigInteger(prng(qs).join(''), 16);
-        while(!privateKey.q.isProbablePrime(PRIMECHECK)) {
-          privateKey.q = new BigInteger(prng(qs).join(''), 16);
-        }
-        privateKey.q.subtract(BigInteger.one);
-        if (BigInteger.gcd(privateKey.q, ee).compareTo(BigInteger.one) === 0 && privateKey.q.isProbablePrime(PRIMECHECK)) break;
-      }
-      if (privateKey.p.compareTo(privateKey.q) <= 0) {
-        const t = privateKey.p;
-        privateKey.p = privateKey.q;
-        privateKey.q = t;
-      }
-      const p1 = privateKey.p.subtract(BigInteger.one);
-      const q1 = privateKey.q.subtract(BigInteger.one);
-      const phi = p1.multiply(q1);
-      if (BigInteger.gcd(phi, ee).compareTo(BigInteger.one) === 0) {
-        privateKey.n = privateKey.p.multiply(privateKey.q);
-        privateKey.d = ee.modInv(phi);
-        privateKey.dmp1 = privateKey.d.mod(p1);
-        privateKey.dmq1 = privateKey.d.mod(q1);
-        privateKey.coeff = privateKey.q.modInv(privateKey.p);
-        break;
-      }
-    }
-    const publicKey = privateKey.publicKey();
-    resolve({
-      publicKey,
-      privateKey
-    });
-  });
-};
-
 // Encrypt from public/private key
 function encrypt(inBuffer, key) {
   var m = pkcs1pad2(inBuffer, (key.n.bitLength()+7) >> 3);
@@ -567,7 +564,7 @@ function decrypt(enc, key) {
 }
 
 const encypht = (original, publicKey) => {
-  const password = buffer.Buffer.from(prng(TOKENSIZE).map( chr => {
+  const password = buffer.Buffer.from(prng(publicKey.options.tokenSize).map( chr => {
     return chr.toString()
   }));
   const omessage = buffer.Buffer.from(original);
@@ -584,6 +581,19 @@ const decypht = (cypht, privateKey) => {
   const message = cypht.slice(tokenLength+1);
   const dmessage = AesCtr.decrypt(message, pass, 256);
   return dmessage;
+};
+
+const generateKeys = (options={}) => {
+  return new Promise( (resolve, reject) => {
+    const privateKey = new CyphtPrivateKey(options);
+    privateKey.generate().then( () => {
+      const publicKey = privateKey.publicKey();
+      resolve({
+        privateKey,
+        publicKey
+      });
+    });
+  });
 };
 
 const cypht = {
