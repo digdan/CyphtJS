@@ -1,3 +1,5 @@
+import { Buffer } from 'buffer';
+
 class Aes {
     static cipher(input, w) {
         const Nb = 4;
@@ -144,17 +146,15 @@ Aes.rCon = [
 ];
 
 class AesCtr extends Aes {
-    static encrypt(plaintext, password, nBits) {
+    static encrypt(inBuffer, password, nBits) {
         if (![ 128, 192, 256 ].includes(nBits)) throw new Error('Key size is not 128 / 192 / 256');
-        plaintext = AesCtr.utf8Encode(String(plaintext));
-        password = AesCtr.utf8Encode(String(password));
 
         // use AES itself to encrypt password to get cipher key (using plain password as source for key
         // expansion) to give us well encrypted key (in real use hashed password could be used for key)
         const nBytes = nBits/8; // no bytes in key (16/24/32)
         const pwBytes = new Array(nBytes);
         for (let i=0; i<nBytes; i++) { // use 1st 16/24/32 chars of password for key
-            pwBytes[i] = i<password.length ?  password.charCodeAt(i) : 0;
+            pwBytes[i] = i<password.length ?  password[i] : 0;
         }
         let key = Aes.cipher(pwBytes, Aes.keyExpansion(pwBytes)); // gives us 16-byte key
         key = key.concat(key.slice(0, nBytes-16)); // expand key to 16/24/32 bytes long
@@ -167,26 +167,19 @@ class AesCtr extends Aes {
         const nonceRnd = Math.floor(Math.random()*0xffff);
         // for debugging: const [ nonceMs, nonceSec, nonceRnd ] = [ 0, 0, 0 ];
         const counterBlock = [ // 16-byte array; blocksize is fixed at 16 for AES
-            nonceMs  & 0xff, nonceMs >>>8 & 0xff,
-            nonceRnd & 0xff, nonceRnd>>>8 & 0xff,
-            nonceSec & 0xff, nonceSec>>>8 & 0xff, nonceSec>>>16 & 0xff, nonceSec>>>24 & 0xff,
-            0, 0, 0, 0, 0, 0, 0, 0,
+          nonceMs  & 0xff, nonceMs >>>8 & 0xff,
+          nonceRnd & 0xff, nonceRnd>>>8 & 0xff,
+          nonceSec & 0xff, nonceSec>>>8 & 0xff, nonceSec>>>16 & 0xff, nonceSec>>>24 & 0xff,
+          0, 0, 0, 0, 0, 0, 0, 0,
         ];
 
-        // and convert nonce to a string to go on the front of the ciphertext
-        const nonceStr = counterBlock.slice(0, 8).map(i => String.fromCharCode(i)).join('');
+        const nonce = counterBlock.slice(0, 8);
 
         // convert (utf-8) plaintext to byte array
-        const plaintextBytes = plaintext.split('').map(ch => ch.charCodeAt(0));
 
         // ------------ perform encryption ------------
-        const ciphertextBytes = AesCtr.nistEncryption(plaintextBytes, key, counterBlock);
-
-        // convert byte array to (utf-8) ciphertext string
-        const ciphertextUtf8 = ciphertextBytes.map(i => String.fromCharCode(i)).join('');
-        return nonceStr+ciphertextUtf8;
-        const ciphertextB64 =  AesCtr.base64Encode(nonceStr+ciphertextUtf8);
-        return ciphertextB64;
+        const ciphertextBytes = AesCtr.nistEncryption(inBuffer, key, counterBlock);
+        return Buffer.concat([Buffer.from(nonce), Buffer.from(ciphertextBytes)]);
     }
 
     /**
@@ -259,35 +252,35 @@ class AesCtr extends Aes {
     static decrypt(ciphertext, password, nBits) {
         if (![ 128, 192, 256 ].includes(nBits)) throw new Error('Key size is not 128 / 192 / 256');
         //ciphertext = AesCtr.base64Decode(String(ciphertext));
-        password = AesCtr.utf8Encode(String(password));
+        //password = AesCtr.utf8Encode(String(password));
 
         // use AES to encrypt password (mirroring encrypt routine)
         const nBytes = nBits/8; // no bytes in key
         const pwBytes = new Array(nBytes);
         for (let i=0; i<nBytes; i++) { // use 1st nBytes chars of password for key
-            pwBytes[i] = i<password.length ?  password.charCodeAt(i) : 0;
+            pwBytes[i] = i<password.length ?  password[i] : 0;
         }
         let key = Aes.cipher(pwBytes, Aes.keyExpansion(pwBytes));
         key = key.concat(key.slice(0, nBytes-16)); // expand key to 16/24/32 bytes long
 
         // recover nonce from 1st 8 bytes of ciphertext into 1st 8 bytes of counter block
         const counterBlock = [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ];
-        for (let i=0; i<8; i++) counterBlock[i] = ciphertext.charCodeAt(i);
+        for (let i=0; i<8; i++) counterBlock[i] = ciphertext[i];
 
         // convert ciphertext to byte array (skipping past initial 8 bytes)
         const ciphertextBytes = new Array(ciphertext.length-8);
-        for (let i=8; i<ciphertext.length; i++) ciphertextBytes[i-8] = ciphertext.charCodeAt(i);
+        for (let i=8; i<ciphertext.length; i++) ciphertextBytes[i-8] = ciphertext[i];
 
         // ------------ perform decryption ------------
         const plaintextBytes = AesCtr.nistDecryption(ciphertextBytes, key, counterBlock);
 
         // convert byte array to (utf-8) plaintext string
-        const plaintextUtf8 = plaintextBytes.map(i => String.fromCharCode(i)).join('');
+        //const plaintextUtf8 = plaintextBytes.map(i => String.fromCharCode(i)).join('');
 
         // decode from UTF8 back to Unicode multi-byte chars
-        const plaintext = AesCtr.utf8Decode(plaintextUtf8);
+        //const plaintext = AesCtr.utf8Decode(plaintextUtf8);
 
-        return plaintext;
+        return Buffer.from(plaintextBytes);
     }
 
     /**
@@ -373,29 +366,6 @@ class AesCtr extends Aes {
             return decodeURIComponent(escape(str)); // monsur.hossa.in/2012/07/20/utf-8-in-javascript.html
         }
     }
-
-    /*
-     * Encodes string as base-64.
-     *
-     * - developer.mozilla.org/en-US/docs/Web/API/window.btoa, nodejs.org/api/buffer.html
-     * - note: btoa & Buffer/binary work on single-byte Unicode (C0/C1), so ok for utf8 strings, not for general Unicode...
-     * - note: if btoa()/atob() are not available (eg IE9-), try github.com/davidchambers/Base64.js
-     */
-    static base64Encode(str) {
-        if (typeof btoa != 'undefined') return btoa(str); // browser
-        if (typeof Buffer != 'undefined') return new Buffer(str, 'binary').toString('base64'); // Node.js
-        throw new Error('No Base64 Encode');
-    }
-
-    /*
-     * Decodes base-64 encoded string.
-     */
-    static base64Decode(str) {
-        if (typeof atob != 'undefined') return atob(str); // browser
-        if (typeof Buffer != 'undefined') return new Buffer(str, 'base64').toString('binary'); // Node.js
-        throw new Error('No Base64 Decode');
-    }
-
 }
 
 export {

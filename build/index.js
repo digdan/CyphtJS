@@ -4,7 +4,6 @@ function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'defau
 
 var BigInteger = _interopDefault(require('big-integer'));
 var buffer = require('buffer');
-var basex = _interopDefault(require('base-x'));
 
 class Aes {
     static cipher(input, w) {
@@ -152,17 +151,15 @@ Aes.rCon = [
 ];
 
 class AesCtr extends Aes {
-    static encrypt(plaintext, password, nBits) {
+    static encrypt(inBuffer, password, nBits) {
         if (![ 128, 192, 256 ].includes(nBits)) throw new Error('Key size is not 128 / 192 / 256');
-        plaintext = AesCtr.utf8Encode(String(plaintext));
-        password = AesCtr.utf8Encode(String(password));
 
         // use AES itself to encrypt password to get cipher key (using plain password as source for key
         // expansion) to give us well encrypted key (in real use hashed password could be used for key)
         const nBytes = nBits/8; // no bytes in key (16/24/32)
         const pwBytes = new Array(nBytes);
         for (let i=0; i<nBytes; i++) { // use 1st 16/24/32 chars of password for key
-            pwBytes[i] = i<password.length ?  password.charCodeAt(i) : 0;
+            pwBytes[i] = i<password.length ?  password[i] : 0;
         }
         let key = Aes.cipher(pwBytes, Aes.keyExpansion(pwBytes)); // gives us 16-byte key
         key = key.concat(key.slice(0, nBytes-16)); // expand key to 16/24/32 bytes long
@@ -175,26 +172,19 @@ class AesCtr extends Aes {
         const nonceRnd = Math.floor(Math.random()*0xffff);
         // for debugging: const [ nonceMs, nonceSec, nonceRnd ] = [ 0, 0, 0 ];
         const counterBlock = [ // 16-byte array; blocksize is fixed at 16 for AES
-            nonceMs  & 0xff, nonceMs >>>8 & 0xff,
-            nonceRnd & 0xff, nonceRnd>>>8 & 0xff,
-            nonceSec & 0xff, nonceSec>>>8 & 0xff, nonceSec>>>16 & 0xff, nonceSec>>>24 & 0xff,
-            0, 0, 0, 0, 0, 0, 0, 0,
+          nonceMs  & 0xff, nonceMs >>>8 & 0xff,
+          nonceRnd & 0xff, nonceRnd>>>8 & 0xff,
+          nonceSec & 0xff, nonceSec>>>8 & 0xff, nonceSec>>>16 & 0xff, nonceSec>>>24 & 0xff,
+          0, 0, 0, 0, 0, 0, 0, 0,
         ];
 
-        // and convert nonce to a string to go on the front of the ciphertext
-        const nonceStr = counterBlock.slice(0, 8).map(i => String.fromCharCode(i)).join('');
+        const nonce = counterBlock.slice(0, 8);
 
         // convert (utf-8) plaintext to byte array
-        const plaintextBytes = plaintext.split('').map(ch => ch.charCodeAt(0));
 
         // ------------ perform encryption ------------
-        const ciphertextBytes = AesCtr.nistEncryption(plaintextBytes, key, counterBlock);
-
-        // convert byte array to (utf-8) ciphertext string
-        const ciphertextUtf8 = ciphertextBytes.map(i => String.fromCharCode(i)).join('');
-        return nonceStr+ciphertextUtf8;
-        const ciphertextB64 =  AesCtr.base64Encode(nonceStr+ciphertextUtf8);
-        return ciphertextB64;
+        const ciphertextBytes = AesCtr.nistEncryption(inBuffer, key, counterBlock);
+        return buffer.Buffer.concat([buffer.Buffer.from(nonce), buffer.Buffer.from(ciphertextBytes)]);
     }
 
     /**
@@ -267,35 +257,35 @@ class AesCtr extends Aes {
     static decrypt(ciphertext, password, nBits) {
         if (![ 128, 192, 256 ].includes(nBits)) throw new Error('Key size is not 128 / 192 / 256');
         //ciphertext = AesCtr.base64Decode(String(ciphertext));
-        password = AesCtr.utf8Encode(String(password));
+        //password = AesCtr.utf8Encode(String(password));
 
         // use AES to encrypt password (mirroring encrypt routine)
         const nBytes = nBits/8; // no bytes in key
         const pwBytes = new Array(nBytes);
         for (let i=0; i<nBytes; i++) { // use 1st nBytes chars of password for key
-            pwBytes[i] = i<password.length ?  password.charCodeAt(i) : 0;
+            pwBytes[i] = i<password.length ?  password[i] : 0;
         }
         let key = Aes.cipher(pwBytes, Aes.keyExpansion(pwBytes));
         key = key.concat(key.slice(0, nBytes-16)); // expand key to 16/24/32 bytes long
 
         // recover nonce from 1st 8 bytes of ciphertext into 1st 8 bytes of counter block
         const counterBlock = [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ];
-        for (let i=0; i<8; i++) counterBlock[i] = ciphertext.charCodeAt(i);
+        for (let i=0; i<8; i++) counterBlock[i] = ciphertext[i];
 
         // convert ciphertext to byte array (skipping past initial 8 bytes)
         const ciphertextBytes = new Array(ciphertext.length-8);
-        for (let i=8; i<ciphertext.length; i++) ciphertextBytes[i-8] = ciphertext.charCodeAt(i);
+        for (let i=8; i<ciphertext.length; i++) ciphertextBytes[i-8] = ciphertext[i];
 
         // ------------ perform decryption ------------
         const plaintextBytes = AesCtr.nistDecryption(ciphertextBytes, key, counterBlock);
 
         // convert byte array to (utf-8) plaintext string
-        const plaintextUtf8 = plaintextBytes.map(i => String.fromCharCode(i)).join('');
+        //const plaintextUtf8 = plaintextBytes.map(i => String.fromCharCode(i)).join('');
 
         // decode from UTF8 back to Unicode multi-byte chars
-        const plaintext = AesCtr.utf8Decode(plaintextUtf8);
+        //const plaintext = AesCtr.utf8Decode(plaintextUtf8);
 
-        return plaintext;
+        return buffer.Buffer.from(plaintextBytes);
     }
 
     /**
@@ -381,34 +371,9 @@ class AesCtr extends Aes {
             return decodeURIComponent(escape(str)); // monsur.hossa.in/2012/07/20/utf-8-in-javascript.html
         }
     }
-
-    /*
-     * Encodes string as base-64.
-     *
-     * - developer.mozilla.org/en-US/docs/Web/API/window.btoa, nodejs.org/api/buffer.html
-     * - note: btoa & Buffer/binary work on single-byte Unicode (C0/C1), so ok for utf8 strings, not for general Unicode...
-     * - note: if btoa()/atob() are not available (eg IE9-), try github.com/davidchambers/Base64.js
-     */
-    static base64Encode(str) {
-        if (typeof btoa != 'undefined') return btoa(str); // browser
-        if (typeof Buffer != 'undefined') return new Buffer(str, 'binary').toString('base64'); // Node.js
-        throw new Error('No Base64 Encode');
-    }
-
-    /*
-     * Decodes base-64 encoded string.
-     */
-    static base64Decode(str) {
-        if (typeof atob != 'undefined') return atob(str); // browser
-        if (typeof Buffer != 'undefined') return new Buffer(str, 'base64').toString('binary'); // Node.js
-        throw new Error('No Base64 Decode');
-    }
-
 }
 
-// URL Safe Characters - Also safe for messaging
-const BASE75 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_~()\'!*:@,;';
-const baseConverter = basex(BASE75);
+//import baseConverter from './baseConverter';
 
 class CyphtPublicKey {
   constructor(privateKey) {
@@ -421,11 +386,11 @@ class CyphtPublicKey {
   }
 
   export() {
-    return baseConverter.encode(new buffer.Buffer(this.n.toArray(256).value));
+    return buffer.Buffer.from(this.n.toArray(256).value);
   }
 
   import(baseNotation, exponent=65537) {
-    this.n = baseConverter.decode(baseNotation);
+    this.n = BigInteger(baseNotation);
     this.e = parseInt(exponent);
   }
 }
@@ -459,16 +424,10 @@ class CyphtPrivateKey {
 
 }
 
-const EXPON = 65537; // Default cryptographic exponent
-const KEYSIZE = 64; //In Bytes
-const PRIMECHECK = 1; // Certainty of a prime
-const TOKENSIZE = 32; //In Bytes - Token assymetrically encryted and used for AES cipher Password
-
 //Psudo Random Number Generator -- in hex
 const prng = len => Array(len)
   .fill()
   .map(() => parseInt((Math.round(Math.random() * 256))).toString(16));
-
 
 // Turns integer into text
 const pkcs1unpad2 = (d, n) => {
@@ -497,7 +456,7 @@ const pkcs1unpad2 = (d, n) => {
       i += 2;
     }
   }
-  return ret;
+  return buffer.Buffer.from(ret);
 };
 
 // Turns text into an integer
@@ -509,7 +468,7 @@ const pkcs1pad2 = (s, n) => {
   var ba = new Array();
   var i = s.length - 1;
   while(i >= 0 && n > 0) {
-    var c = s.charCodeAt(i--);
+    var c = s[i--];
     if(c < 128) { // encode using utf-8
       ba[--n] = c;
     } else if((c > 127) && (c < 2048)) {
@@ -532,6 +491,13 @@ const pkcs1pad2 = (s, n) => {
   ba[--n] = 0;
   return new BigInteger.fromArray(ba, 256);
 };
+
+//import baseConverter from './baseConverter';
+
+const EXPON = 65537; // Default cryptographic exponent
+const KEYSIZE = 64; //In Bytes
+const PRIMECHECK = 1; // Certainty of a prime
+const TOKENSIZE = 32; //In Bytes - Token assymetrically encryted and used for AES cipher Password
 
 // Key generation
 const generateKeys = (keySize=KEYSIZE, exponent=EXPON) => {
@@ -584,35 +550,40 @@ const generateKeys = (keySize=KEYSIZE, exponent=EXPON) => {
 };
 
 // Encrypt from public/private key
-function encrypt(text, key) {
-  var m = pkcs1pad2(text, (key.n.bitLength()+7) >> 3);
+function encrypt(inBuffer, key) {
+  var m = pkcs1pad2(inBuffer, (key.n.bitLength()+7) >> 3);
   if(m == null) return null;
   var c = key.crypt(m);
   if(c == null) return null;
-  return baseConverter.encode(new buffer.Buffer(c.toArray(256).value));
+  return new buffer.Buffer.from(c.toArray(256).value);
 }
 
 // Decrypt from private key
 function decrypt(enc, key) {
-  var c = new BigInteger.fromArray([...baseConverter.decode(enc)], 256);
+  var c = new BigInteger.fromArray([...enc], 256);
   var m = key.crypt(c);
   if(m == null) return null;
   return pkcs1unpad2(m, (key.n.bitLength()+7)>>3);
 }
 
 const encypht = (original, publicKey) => {
-  const password = prng(TOKENSIZE).map( chr => {
-    return String.fromCharCode(chr);
-  }).join('');
-  const encMessage = AesCtr.encrypt(original, password, 256);
+  const password = buffer.Buffer.from(prng(TOKENSIZE).map( chr => {
+    return chr.toString()
+  }));
+  const omessage = buffer.Buffer.from(original);
+  const encMessage = new buffer.Buffer.from(AesCtr.encrypt(omessage, password, 256));
   const encPassword = encrypt(password, publicKey);
-  return [encPassword, baseConverter.encode(new buffer.Buffer(encMessage))].join('.');
+  const outLength = encMessage.length + encPassword.length + 1;
+  return buffer.Buffer.concat([ buffer.Buffer.from([encPassword.length]), encPassword, encMessage ], outLength);
 };
 
 const decypht = (cypht, privateKey) => {
-  const cyphtp = cypht.split('.');
-  const pass = decrypt(cyphtp[0], privateKey);
-  return AesCtr.decrypt(baseConverter.decode(cyphtp[1]).toString(), pass, 256);
+  const tokenLength = cypht[0];
+  const token = cypht.slice( 1, tokenLength+1 );
+  const pass = decrypt(token, privateKey);
+  const message = cypht.slice(tokenLength+1);
+  const dmessage = AesCtr.decrypt(message, pass, 256);
+  return dmessage;
 };
 
 const cypht = {

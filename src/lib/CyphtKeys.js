@@ -1,5 +1,6 @@
-import baseConverter from './baseConverter';
+//import baseConverter from './baseConverter';
 import { Buffer } from 'buffer';
+import BigInteger from 'big-integer';
 
 class CyphtPublicKey {
   constructor(privateKey) {
@@ -12,11 +13,11 @@ class CyphtPublicKey {
   }
 
   export() {
-    return baseConverter.encode(new Buffer(this.n.toArray(256).value));
+    return Buffer.from(this.n.toArray(256).value);
   }
 
   import(baseNotation, exponent=65537) {
-    this.n = baseConverter.decode(baseNotation);
+    this.n = BigInteger(baseNotation);
     this.e = parseInt(exponent);
   }
 }
