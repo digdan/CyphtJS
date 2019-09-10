@@ -500,6 +500,8 @@ class CyphtPrivateKey {
           break;
         }
       }
+      console.log('PK.n', buffer.Buffer.from(this.n.toArray(256).value).length);
+      console.log('PK.d', buffer.Buffer.from(this.d.toArray(256).value).length);
       resolve(
         true
       );

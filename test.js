@@ -13,7 +13,12 @@ function sizeTest(message, keys) {
 
 console.log('Generating keys');
 const started = Date.now();
-cypht.generateKeys().then( keys => {
+cypht.generateKeys({
+  keySize: 256
+}).then( keys => {
+  console.log('pK size', keys.publicKey.exportRaw().length);
+  console.log('PK size', keys.privateKey.exportRaw().length);
+  process.exit();
   console.log('Keys generated in', (Date.now() - started), 'ms');
   console.log('Private Key', keys.privateKey.exportRaw());
   console.log('Public Key', keys.publicKey.exportRaw());
