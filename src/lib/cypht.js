@@ -1,23 +1,23 @@
 import BigInteger from 'big-integer';
 import { Buffer } from 'buffer';
 import { AesCtr } from './AES';
-import { CyphtPrivateKey, CyphtPublicKey } from './CyphtKeys';
+import { CyphtPrivateKey } from './CyphtKeys';
 import { pkcs1pad2, pkcs1unpad2 } from './pkcs1';
 import prng from './prng';
 
 // Encrypt from public/private key
 function encrypt(inBuffer, key) {
-  var m = pkcs1pad2(inBuffer, (key.n.bitLength()+7) >> 3);
+  let m = pkcs1pad2(inBuffer, (key.n.bitLength()+7) >> 3);
   if(m == null) return null;
-  var c = key.crypt(m);
+  let c = key.crypt(m);
   if(c == null) return null;
   return new Buffer.from(c.toArray(256).value);
 }
 
 // Decrypt from private key
 function decrypt(enc, key) {
-  var c = new BigInteger.fromArray([...enc], 256);
-  var m = key.crypt(c);
+  let c = new BigInteger.fromArray([...enc], 256);
+  let m = key.crypt(c);
   if(m == null) return null;
   return pkcs1unpad2(m, (key.n.bitLength()+7)>>3);
 }
