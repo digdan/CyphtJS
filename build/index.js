@@ -389,12 +389,18 @@ class CyphtPublicKey {
     return x.modPow(this.e, this.n);
   }
 
-  export() {
+  verify(x, target) {
+    const verifyBuffer = buffer.Buffer.from(this.crypt(BigInteger.fromArray([...x], 256)).toArray(256).value);
+    const targetBuffer = buffer.Buffer.from(BigInteger(target).toArray(256).value);
+    return verifyBuffer.equals(targetBuffer);
+  }
+
+  exportRaw() {
     return buffer.Buffer.from(this.n.toArray(256).value);
   }
 
-  import(baseNotation, exponent=65537) {
-    this.n = BigInteger(baseNotation);
+  importRaw(octetStream, exponent=65537) {
+    this.n = BigInteger.fromArray([...octectStream], 256);
     this.e = parseInt(exponent);
   }
 }
@@ -433,6 +439,24 @@ class CyphtPrivateKey {
 
   publicKey() { //Public Key factory
     return new CyphtPublicKey(this);
+  }
+
+  sign(x) {
+    return buffer.Buffer.from(this.crypt(BigInteger(x)).toArray(256).value);
+  }
+
+  importRaw(octetStream, exponent=65537) {
+    const firstBuffer = octectStream.slice( 0, (octetStream.length / 2) -1 );
+    const secondBuffer = octectStream.slice( octetStream.length / 2 );
+    this.n = BigInteger.fromArray([...firstBuffer], 256);
+    this.d = BigInteger.fromArray([...secondBuffer], 256);
+    this.e = parseInt(exponent);
+  }
+
+  exportRaw() {
+    const firstBuffer = buffer.Buffer.from(this.n.toArray(256).value);
+    const secondBuffer = buffer.Buffer.from(this.d.toArray(256).value);
+    return buffer.Buffer.concat([firstBuffer, secondBuffer]);
   }
 
   // Key generation
@@ -548,17 +572,17 @@ const pkcs1pad2 = (s, n) => {
 
 // Encrypt from public/private key
 function encrypt(inBuffer, key) {
-  var m = pkcs1pad2(inBuffer, (key.n.bitLength()+7) >> 3);
+  let m = pkcs1pad2(inBuffer, (key.n.bitLength()+7) >> 3);
   if(m == null) return null;
-  var c = key.crypt(m);
+  let c = key.crypt(m);
   if(c == null) return null;
   return new buffer.Buffer.from(c.toArray(256).value);
 }
 
 // Decrypt from private key
 function decrypt(enc, key) {
-  var c = new BigInteger.fromArray([...enc], 256);
-  var m = key.crypt(c);
+  let c = new BigInteger.fromArray([...enc], 256);
+  let m = key.crypt(c);
   if(m == null) return null;
   return pkcs1unpad2(m, (key.n.bitLength()+7)>>3);
 }

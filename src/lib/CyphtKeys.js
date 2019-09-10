@@ -13,12 +13,18 @@ class CyphtPublicKey {
     return x.modPow(this.e, this.n);
   }
 
-  export() {
+  verify(x, target) {
+    const verifyBuffer = Buffer.from(this.crypt(BigInteger.fromArray([...x], 256)).toArray(256).value);
+    const targetBuffer = Buffer.from(BigInteger(target).toArray(256).value);
+    return verifyBuffer.equals(targetBuffer);
+  }
+
+  exportRaw() {
     return Buffer.from(this.n.toArray(256).value);
   }
 
-  import(baseNotation, exponent=65537) {
-    this.n = BigInteger(baseNotation);
+  importRaw(octetStream, exponent=65537) {
+    this.n = BigInteger.fromArray([...octectStream], 256);
     this.e = parseInt(exponent);
   }
 }
@@ -57,6 +63,24 @@ class CyphtPrivateKey {
 
   publicKey() { //Public Key factory
     return new CyphtPublicKey(this);
+  }
+
+  sign(x) {
+    return Buffer.from(this.crypt(BigInteger(x)).toArray(256).value);
+  }
+
+  importRaw(octetStream, exponent=65537) {
+    const firstBuffer = octectStream.slice( 0, (octetStream.length / 2) -1 );
+    const secondBuffer = octectStream.slice( octetStream.length / 2 );
+    this.n = BigInteger.fromArray([...firstBuffer], 256);
+    this.d = BigInteger.fromArray([...secondBuffer], 256);
+    this.e = parseInt(exponent);
+  }
+
+  exportRaw() {
+    const firstBuffer = Buffer.from(this.n.toArray(256).value);
+    const secondBuffer = Buffer.from(this.d.toArray(256).value);
+    return Buffer.concat([firstBuffer, secondBuffer]);
   }
 
   // Key generation

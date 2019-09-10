@@ -15,7 +15,14 @@ console.log('Generating keys');
 const started = Date.now();
 cypht.generateKeys().then( keys => {
   console.log('Keys generated in', (Date.now() - started), 'ms');
-  console.log('Public Key', keys.publicKey.export());
+  console.log('Private Key', keys.privateKey.exportRaw());
+  console.log('Public Key', keys.publicKey.exportRaw());
+  const signPayload = 1337;
+  console.log('Signing test. Payload:', signPayload);
+  const signed = keys.privateKey.sign(signPayload);
+  console.log('Private key signed:', signed);
+  console.log('Public key verified:', keys.publicKey.verify(signed , signPayload));
+  console.log('')
   sizeTest('We strike at dawn', keys);
   sizeTest('The fruitsalad was poisoned', keys);
   sizeTest('Go confidently in the direction of your dreams. Live the life you have imagined.', keys);
