@@ -6,6 +6,7 @@ import prng from './prng';
 const pkcs1unpad2 = (d, n) => {
   var b = d.toArray(256).value;
   var i = 0;
+
   while(i < b.length && b[i] == 0) ++i;
   if(b.length-i != n-1 || b[i] != 2) {
     console.log('bad decrypt input');

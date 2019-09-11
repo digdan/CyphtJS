@@ -1,7 +1,7 @@
 import BigInteger from 'big-integer';
 import { Buffer } from 'buffer';
 import { AesCtr } from './AES';
-import { CyphtPrivateKey } from './CyphtKeys';
+import { CyphtPrivateKey, CyphtPublicKey } from './CyphtKeys';
 import { pkcs1pad2, pkcs1unpad2 } from './pkcs1';
 import prng from './prng';
 
@@ -24,14 +24,14 @@ function decrypt(enc, key) {
 
 const encypht = (original, publicKey) => {
   const password = Buffer.from(prng(publicKey.options.tokenSize).map( chr => {
-    return chr.toString()
+    return chr.toString();
   }));
   const omessage = Buffer.from(original);
   const encMessage = new Buffer.from(AesCtr.encrypt(omessage, password, 256));
   const encPassword = encrypt(password, publicKey);
   const outLength = encMessage.length + encPassword.length + 1;
   return Buffer.concat([ Buffer.from([encPassword.length]), encPassword, encMessage ], outLength);
-}
+};
 
 const decypht = (cypht, privateKey) => {
   const tokenLength = cypht[0];
@@ -40,7 +40,7 @@ const decypht = (cypht, privateKey) => {
   const message = cypht.slice(tokenLength+1);
   const dmessage = AesCtr.decrypt(message, pass, 256);
   return dmessage;
-}
+};
 
 const generateKeys = (options={}) => {
   return new Promise( (resolve, reject) => {
@@ -51,12 +51,14 @@ const generateKeys = (options={}) => {
         privateKey,
         publicKey
       });
-    })
+    });
   });
-}
+};
 
 export {
   generateKeys,
   encypht,
-  decypht
-}
+  decypht,
+  CyphtPrivateKey,
+  CyphtPublicKey
+};

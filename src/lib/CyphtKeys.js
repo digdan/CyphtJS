@@ -2,11 +2,22 @@ import { Buffer } from 'buffer';
 import BigInteger from 'big-integer';
 import prng from './prng';
 
+const defaultOptions = {
+  expon: 65537,
+  keySize: 64,
+  primeCheck: 3,
+  tokenSize: 32
+};
+
 class CyphtPublicKey {
   constructor(privateKey) {
-    this.n = (typeof privateKey === 'undefined' ? null : privateKey.n);
-    this.e = (typeof privateKey === 'undefined' ? 0 : privateKey.e);
-    this.options = privateKey.options;
+    if (typeof privateKey !== 'undefined') {
+      this.n = (typeof privateKey === 'undefined' ? null : privateKey.n);
+      this.e = (typeof privateKey === 'undefined' ? 0 : privateKey.e);
+      this.options = privateKey.options;
+    } else {
+      this.options = defaultOptions;
+    }
   }
 
   crypt(x) {
@@ -24,19 +35,13 @@ class CyphtPublicKey {
   }
 
   importRaw(octetStream, exponent=65537) {
-    this.n = BigInteger.fromArray([...octectStream], 256);
+    this.n = BigInteger.fromArray([...octetStream], 256);
     this.e = parseInt(exponent);
   }
 }
 
 class CyphtPrivateKey {
   constructor( options = {}) {
-    const defaultOptions = {
-      expon: 65537,
-      keySize: 64,
-      primeCheck: 3,
-      tokenSize: 32
-    };
     this.options = Object.assign({}, defaultOptions, options);
     // TODO expand tokenSize based on keySize
     this.n = null; // Private & Public
@@ -69,9 +74,9 @@ class CyphtPrivateKey {
     return Buffer.from(this.crypt(BigInteger(x)).toArray(256).value);
   }
 
-  importRaw(octetStream, exponent=65537) {
-    const firstBuffer = octectStream.slice( 0, (octetStream.length / 2) -1 );
-    const secondBuffer = octectStream.slice( octetStream.length / 2 );
+  importRaw(octetStream, exponent=415031) {
+    const firstBuffer = octetStream.slice( 0, Math.ceil(octetStream.length / 2) );
+    const secondBuffer = octetStream.slice( Math.ceil(octetStream.length / 2) );
     this.n = BigInteger.fromArray([...firstBuffer], 256);
     this.d = BigInteger.fromArray([...secondBuffer], 256);
     this.e = parseInt(exponent);
@@ -124,8 +129,6 @@ class CyphtPrivateKey {
           break;
         }
       }
-      console.log('PK.n', Buffer.from(this.n.toArray(256).value).length);
-      console.log('PK.d', Buffer.from(this.d.toArray(256).value).length);
       resolve(
         true
       );

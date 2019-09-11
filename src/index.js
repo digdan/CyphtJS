@@ -1,11 +1,15 @@
 import {
   generateKeys,
   encypht,
-  decypht
+  decypht,
+  CyphtPrivateKey,
+  CyphtPublicKey
 } from './lib/cypht';
 
 const cypht = {
   generateKeys,
+  CyphtPrivateKey,
+  CyphtPublicKey,
   encypht,
   decypht
 }
