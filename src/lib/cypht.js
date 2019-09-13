@@ -32,13 +32,13 @@ const encypht = (original, key) => {
   const encMessage = new Buffer.from(AesCtr.encrypt(omessage, password, 256));
   const encPassword = encrypt(password, key);
   const outLength = encMessage.length + encPassword.length + 1;
-  const lengthToken = key.isPrivate() ? encPassword.length & PRIVATE_ENCRYPTED : encPassword.length;
+  const lengthToken = key.isPrivate() ? encPassword.length + PRIVATE_ENCRYPTED : encPassword.length;
   return Buffer.concat([ Buffer.from([lengthToken]), encPassword, encMessage ], outLength);
 };
 
 const isPrivateCypht = cypht => {
   const tokenLength = cypht[0];
-  return (tokenLength & PRIVATE_ENCRYPTED);
+  return (tokenLength > PRIVATE_ENCRYPTED);
 };
 
 const decypht = (cypht, key) => {
