@@ -15,7 +15,7 @@ function sizeTest(message, keys) {
 console.log('Generating keys');
 const started = Date.now();
 cypht.generateKeys({
-  keySize: 128
+  keySize: 64
 }).then( keys => {
   console.log('Keys generated in', (Date.now() - started), 'ms');
   console.log('Export/Import test');

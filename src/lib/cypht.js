@@ -5,7 +5,7 @@ import { CyphtPrivateKey, CyphtPublicKey } from './CyphtKeys';
 import { pkcs1pad2, pkcs1unpad2 } from './pkcs1';
 import prng from './prng';
 
-const PRIVATE_ENCRYPTED = 128;
+const PRIVATE_ENCRYPTED = 128; //BitFlag for cyphts encrypted with a private key.
 
 // Encrypt from public/private key
 function encrypt(inBuffer, key) {
@@ -25,6 +25,7 @@ function decrypt(enc, key) {
 }
 
 const encypht = (original, key) => {
+  console.log('Encrypting with token size', key.options.tokenSize);
   const password = Buffer.from(prng(key.options.tokenSize).map( chr => {
     return chr.toString();
   }));

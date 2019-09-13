@@ -2,11 +2,18 @@ import { Buffer } from 'buffer';
 import BigInteger from 'big-integer';
 import prng from './prng';
 
+const tokenSizeMap = {
+  256: 232, // 2048 bit RSA
+  128: 114, // 1024 bit RSA
+  64: 50, // 512 bit
+  32: 18, // 256 bit
+  16: 2 // 128 bit
+};
+
 const defaultOptions = {
   expon: 65537,
   keySize: 64,
-  primeCheck: 2,
-  tokenSize: 32
+  primeCheck: 2
 };
 
 class CyphtPublicKey {
@@ -17,6 +24,7 @@ class CyphtPublicKey {
       this.options = privateKey.options;
     } else {
       this.options = defaultOptions;
+      this.options.tokenSize = tokenSizeMap[this.options.keySize];
     }
   }
 
@@ -51,6 +59,7 @@ class CyphtPublicKey {
 class CyphtPrivateKey {
   constructor( options = {}) {
     this.options = Object.assign({}, defaultOptions, options);
+    this.options.tokenSize = tokenSizeMap[this.options.keySize];
     // TODO expand tokenSize based on keySize
     this.n = null; // Private & Public
     this.e = 0; // Private & Public
