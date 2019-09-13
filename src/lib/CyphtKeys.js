@@ -5,7 +5,7 @@ import prng from './prng';
 const defaultOptions = {
   expon: 65537,
   keySize: 64,
-  primeCheck: 3,
+  primeCheck: 2,
   tokenSize: 32
 };
 
@@ -18,6 +18,14 @@ class CyphtPublicKey {
     } else {
       this.options = defaultOptions;
     }
+  }
+
+  isPublic() {
+    return true;
+  }
+
+  isPrivate() {
+    return false;
   }
 
   crypt(x) {
@@ -34,7 +42,7 @@ class CyphtPublicKey {
     return Buffer.from(this.n.toArray(256).value);
   }
 
-  importRaw(octetStream, exponent=65537) {
+  importRaw(octetStream, exponent=415031) {
     this.n = BigInteger.fromArray([...octetStream], 256);
     this.e = parseInt(exponent);
   }
@@ -68,6 +76,14 @@ class CyphtPrivateKey {
 
   publicKey() { //Public Key factory
     return new CyphtPublicKey(this);
+  }
+
+  isPublic() {
+    return false;
+  }
+
+  isPrivate() {
+    return true;
   }
 
   sign(x) {

@@ -5,6 +5,8 @@ import { CyphtPrivateKey, CyphtPublicKey } from './CyphtKeys';
 import { pkcs1pad2, pkcs1unpad2 } from './pkcs1';
 import prng from './prng';
 
+const PRIVATE_ENCRYPTED = 128;
+
 // Encrypt from public/private key
 function encrypt(inBuffer, key) {
   let m = pkcs1pad2(inBuffer, (key.n.bitLength()+7) >> 3);
@@ -22,21 +24,32 @@ function decrypt(enc, key) {
   return pkcs1unpad2(m, (key.n.bitLength()+7)>>3);
 }
 
-const encypht = (original, publicKey) => {
-  const password = Buffer.from(prng(publicKey.options.tokenSize).map( chr => {
+const encypht = (original, key) => {
+  const password = Buffer.from(prng(key.options.tokenSize).map( chr => {
     return chr.toString();
   }));
   const omessage = Buffer.from(original);
   const encMessage = new Buffer.from(AesCtr.encrypt(omessage, password, 256));
-  const encPassword = encrypt(password, publicKey);
+  const encPassword = encrypt(password, key);
   const outLength = encMessage.length + encPassword.length + 1;
-  return Buffer.concat([ Buffer.from([encPassword.length]), encPassword, encMessage ], outLength);
+  const lengthToken = key.isPrivate() ? encPassword.length & PRIVATE_ENCRYPTED : encPassword.length;
+  return Buffer.concat([ Buffer.from([lengthToken]), encPassword, encMessage ], outLength);
 };
 
-const decypht = (cypht, privateKey) => {
+const isPrivateCypht = cypht => {
   const tokenLength = cypht[0];
+  return (tokenLength & PRIVATE_ENCRYPTED);
+};
+
+const decypht = (cypht, key) => {
+  let tokenLength;
+  if (isPrivateCypht(cypht)) {
+    tokenLength = (cypht[0] - PRIVATE_ENCRYPTED);
+  } else {
+    tokenLength = cypht[0];
+  }
   const token = cypht.slice( 1, tokenLength+1 );
-  const pass = decrypt(token, privateKey);
+  const pass = decrypt(token, key);
   const message = cypht.slice(tokenLength+1);
   const dmessage = AesCtr.decrypt(message, pass, 256);
   return dmessage;
@@ -59,6 +72,7 @@ export {
   generateKeys,
   encypht,
   decypht,
+  isPrivateCypht,
   CyphtPrivateKey,
   CyphtPublicKey
 };
