@@ -2,18 +2,10 @@ import { Buffer } from 'buffer';
 import BigInteger from 'big-integer';
 import prng from './prng';
 
-const tokenSizeMap = {
-  256: 232, // 2048 bit RSA
-  128: 114, // 1024 bit RSA
-  64: 50, // 512 bit
-  32: 18, // 256 bit
-  16: 2 // 128 bit
-};
-
 const defaultOptions = {
   expon: 65537,
-  keySize: 64,
-  primeCheck: 2
+  keySize: 128,
+  primeCheck: 3
 };
 
 class CyphtPublicKey {
@@ -24,7 +16,6 @@ class CyphtPublicKey {
       this.options = privateKey.options;
     } else {
       this.options = defaultOptions;
-      this.options.tokenSize = tokenSizeMap[this.options.keySize];
     }
   }
 
@@ -40,9 +31,14 @@ class CyphtPublicKey {
     return x.modPow(this.e, this.n);
   }
 
+  randomToken() {
+    const tokenSize = this.n.toArray(256).value.length - 11;
+    return Buffer.from(prng(tokenSize > 32 ? 32 : tokenSize).join(''), 'hex');
+  }
+
   verify(x, target) {
     const verifyBuffer = Buffer.from(this.crypt(BigInteger.fromArray([...x], 256)).toArray(256).value);
-    const targetBuffer = Buffer.from(BigInteger(target).toArray(256).value);
+    const targetBuffer = Buffer.from(BigInteger.fromArray([...target], 256).toArray(256).value);
     return verifyBuffer.equals(targetBuffer);
   }
 
@@ -59,8 +55,6 @@ class CyphtPublicKey {
 class CyphtPrivateKey {
   constructor( options = {}) {
     this.options = Object.assign({}, defaultOptions, options);
-    this.options.tokenSize = tokenSizeMap[this.options.keySize];
-    // TODO expand tokenSize based on keySize
     this.n = null; // Private & Public
     this.e = 0; // Private & Public
     this.d = null; // Private
@@ -69,6 +63,8 @@ class CyphtPrivateKey {
     this.dmp1 = null;
     this.dmq1 = null;
     this.coeff = null;
+
+    this.generationIterations = [0,0];
   }
 
   crypt(x) {
@@ -81,6 +77,11 @@ class CyphtPrivateKey {
       xp = xp.add(this.p);
     }
     return xp.subtract(xq).multiply(this.coeff).mod(this.p).multiply(this.q).add(xq);
+  }
+
+  randomToken() {
+    const tokenSize = this.d.toArray(256).value.length - 11;
+    return Buffer.from(prng(tokenSize > 32 ? 32 : tokenSize).join(''), 'hex');
   }
 
   publicKey() { //Public Key factory
@@ -96,7 +97,7 @@ class CyphtPrivateKey {
   }
 
   sign(x) {
-    return Buffer.from(this.crypt(BigInteger(x)).toArray(256).value);
+    return Buffer.from(this.crypt(BigInteger.fromArray([...x], 256)).toArray(256).value);
   }
 
   importRaw(octetStream, exponent=415031) {
@@ -124,6 +125,7 @@ class CyphtPrivateKey {
           //Populate a big int with random bytes
           this.p = new BigInteger(prng(this.options.keySize - qs).join(''), 16);
           while(!this.p.isProbablePrime(this.options.primeCheck)) { //Is this random number prime?
+            this.generationIterations[0]++;
             this.p = new BigInteger(prng(this.options.keySize - qs).join(''), 16);
           }
           this.p.subtract(BigInteger.one);
@@ -132,6 +134,7 @@ class CyphtPrivateKey {
         for(;;) {
           this.q = new BigInteger(prng(qs).join(''), 16);
           while(!this.q.isProbablePrime(this.options.primeCheck)) {
+            this.generationIterations[1]++;
             this.q = new BigInteger(prng(qs).join(''), 16);
           }
           this.q.subtract(BigInteger.one);

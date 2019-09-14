@@ -2,7 +2,6 @@ import {
   generateKeys,
   encypht,
   decypht,
-  isPrivateCypht,
   CyphtPrivateKey,
   CyphtPublicKey
 } from './lib/cypht';
@@ -12,8 +11,7 @@ const cypht = {
   CyphtPrivateKey,
   CyphtPublicKey,
   encypht,
-  decypht,
-  isPrivateCypht
+  decypht
 };
 
 export {
