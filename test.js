@@ -17,7 +17,7 @@ console.log('Generating', keySize*8,'bit RSA keys');
 const started = Date.now();
 cypht.generateKeys({
   keySize,
-  //seed: 'andanotheronebitesthedustisagreatsongandihighlysuggestit'
+  seed: 'Password|email@address.com'
 }).then( keys => {
   console.log('Keys generated in', (Date.now() - started), 'ms');
   console.log('Prime iterations p=', keys.privateKey.generationIterations[0],'q=',keys.privateKey.generationIterations[1]);
@@ -26,6 +26,7 @@ cypht.generateKeys({
   console.log('Public Key', keys.publicKey.exportRaw().toString('hex'));
   publicKey.importRaw(keys.publicKey.exportRaw());
   const privateKey = new cypht.CyphtPrivateKey;
+  console.log('Private Key', keys.privateKey.exportRaw().toString('hex'));
   privateKey.importRaw(keys.privateKey.exportRaw());
   const signPayload = publicKey.randomToken();
   console.log('Signing test. Payload Size:', signPayload.length);
