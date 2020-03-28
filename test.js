@@ -23,8 +23,8 @@ cypht.generateKeys({
   publicKey.importRaw(keys.publicKey.exportRaw());
   const privateKey = new cypht.CyphtPrivateKey;
   privateKey.importRaw(keys.privateKey.exportRaw());
-  const signPayload = 1337;
-  console.log('Signing test. Payload:', signPayload);
+  const signPayload = keys.privateKey.randomToken();
+  console.log('Signing test. Payload size:', signPayload.length);
   const signed = privateKey.sign(signPayload);
   console.log('Public key verified:', publicKey.verify(signed, signPayload));
   sizeTest('We strike at dawn', {publicKey, privateKey});

@@ -25,10 +25,7 @@ function decrypt(enc, key) {
 }
 
 const encypht = (original, key) => {
-  console.log('Encrypting with token size', key.options.tokenSize);
-  const password = Buffer.from(prng(key.options.tokenSize).map( chr => {
-    return chr.toString();
-  }));
+  const password = key.randomToken();
   const omessage = Buffer.from(original);
   const encMessage = new Buffer.from(AesCtr.encrypt(omessage, password, 256));
   const encPassword = encrypt(password, key);
