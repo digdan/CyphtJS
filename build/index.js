@@ -238,24 +238,18 @@ class AesCtr extends Aes {
 }
 
 //Psudo Random Number Generator -- in hex
-const prng = len => Array(len)
+const prng = len => {
+  const rna = Array(len)
   .fill()
   .map(() => parseInt((Math.round(Math.random() * 256))).toString(16));
-
-const tokenSizeMap = {
-  256: 232, // 2048 bit RSA
-  128: 114, // 1024 bit RSA
-  64: 50, // 512 bit
-  32: 18, // 256 bit
-  16: 2 // 128 bit
+  return rna;
 };
 
 const defaultOptions = {
   expon: 65537,
-  keySize: 64,
-  primeCheck: 2
+  keySize: 128,
+  primeCheck: 3
 };
-
 
 class CyphtPublicKey {
   constructor(privateKey) {
@@ -265,7 +259,6 @@ class CyphtPublicKey {
       this.options = privateKey.options;
     } else {
       this.options = defaultOptions;
-      this.options.tokenSize = tokenSizeMap[this.options.keySize];
     }
   }
 
@@ -281,9 +274,14 @@ class CyphtPublicKey {
     return x.modPow(this.e, this.n);
   }
 
+  randomToken() {
+    const tokenSize = this.n.toArray(256).value.length - 11;
+    return buffer.Buffer.from(prng(tokenSize > 32 ? 32 : tokenSize).join(''), 'hex');
+  }
+
   verify(x, target) {
     const verifyBuffer = buffer.Buffer.from(this.crypt(BigInteger.fromArray([...x], 256)).toArray(256).value);
-    const targetBuffer = buffer.Buffer.from(BigInteger(target).toArray(256).value);
+    const targetBuffer = buffer.Buffer.from(BigInteger.fromArray([...target], 256).toArray(256).value);
     return verifyBuffer.equals(targetBuffer);
   }
 
@@ -300,8 +298,6 @@ class CyphtPublicKey {
 class CyphtPrivateKey {
   constructor( options = {}) {
     this.options = Object.assign({}, defaultOptions, options);
-    this.options.tokenSize = tokenSizeMap[this.options.keySize];
-    // TODO expand tokenSize based on keySize
     this.n = null; // Private & Public
     this.e = 0; // Private & Public
     this.d = null; // Private
@@ -310,6 +306,8 @@ class CyphtPrivateKey {
     this.dmp1 = null;
     this.dmq1 = null;
     this.coeff = null;
+
+    this.generationIterations = [0,0];
   }
 
   crypt(x) {
@@ -322,6 +320,11 @@ class CyphtPrivateKey {
       xp = xp.add(this.p);
     }
     return xp.subtract(xq).multiply(this.coeff).mod(this.p).multiply(this.q).add(xq);
+  }
+
+  randomToken() {
+    const tokenSize = this.d.toArray(256).value.length - 11;
+    return buffer.Buffer.from(prng(tokenSize > 32 ? 32 : tokenSize).join(''), 'hex');
   }
 
   publicKey() { //Public Key factory
@@ -337,7 +340,7 @@ class CyphtPrivateKey {
   }
 
   sign(x) {
-    return buffer.Buffer.from(this.crypt(BigInteger(x)).toArray(256).value);
+    return buffer.Buffer.from(this.crypt(BigInteger.fromArray([...x], 256)).toArray(256).value);
   }
 
   importRaw(octetStream, exponent=415031) {
@@ -365,6 +368,7 @@ class CyphtPrivateKey {
           //Populate a big int with random bytes
           this.p = new BigInteger(prng(this.options.keySize - qs).join(''), 16);
           while(!this.p.isProbablePrime(this.options.primeCheck)) { //Is this random number prime?
+            this.generationIterations[0]++;
             this.p = new BigInteger(prng(this.options.keySize - qs).join(''), 16);
           }
           this.p.subtract(BigInteger.one);
@@ -373,6 +377,7 @@ class CyphtPrivateKey {
         for(;;) {
           this.q = new BigInteger(prng(qs).join(''), 16);
           while(!this.q.isProbablePrime(this.options.primeCheck)) {
+            this.generationIterations[1]++;
             this.q = new BigInteger(prng(qs).join(''), 16);
           }
           this.q.subtract(BigInteger.one);
@@ -402,125 +407,73 @@ class CyphtPrivateKey {
   }
 }
 
-// Turns integer into text
-const pkcs1unpad2 = (d, n) => {
-  var b = d.toArray(256).value;
-  var i = 0;
-
-  while(i < b.length && b[i] == 0) ++i;
-  if(b.length-i != n-1 || b[i] != 2) {
-    console.log('bad decrypt input');
-    return null;
-  }
-  ++i;
-  while(b[i] != 0)
-    if(++i >= b.length) return null;
-  var ret = "";
-  while(++i < b.length) {
-    var c = b[i] & 255;
-    if(c < 128) { // utf-8 decode
-      ret += String.fromCharCode(c);
+//Byte array functions for control bytes on cyphts
+function longToByteArray(long) {
+    // we want to represent the input as a 2-bytes array
+    var byteArray = [0, 0];
+    for ( var index = 0; index < byteArray.length; index ++ ) {
+        var byte = long & 0xff;
+        byteArray [ index ] = byte;
+        long = (long - byte) / 256 ;
     }
-    else if((c > 191) && (c < 224)) {
-      ret += String.fromCharCode(((c & 31) << 6) | (b[i+1] & 63));
-      ++i;
+    return byteArray;
+}
+function byteArrayToLong(byteArray) {
+    var value = 0;
+    for ( var i = byteArray.length - 1; i >= 0; i--) {
+        value = (value * 256) + byteArray[i];
     }
-    else {
-      ret += String.fromCharCode(((c & 15) << 12) | ((b[i+1] & 63) << 6) | (b[i+2] & 63));
-      i += 2;
-    }
-  }
-  return buffer.Buffer.from(ret);
-};
-
-// Turns text into an integer
-const pkcs1pad2 = (s, n) => {
-  if(n < s.length + 11) { // TODO: fix for utf-8
-    console.log("Message too long for RSA");
-    return null;
-  }
-  var ba = new Array();
-  var i = s.length - 1;
-  while(i >= 0 && n > 0) {
-    var c = s[i--];
-    if(c < 128) { // encode using utf-8
-      ba[--n] = c;
-    } else if((c > 127) && (c < 2048)) {
-      ba[--n] = (c & 63) | 128;
-      ba[--n] = (c >> 6) | 192;
-    } else {
-      ba[--n] = (c & 63) | 128;
-      ba[--n] = ((c >> 6) & 63) | 128;
-      ba[--n] = (c >> 12) | 224;
-    }
-  }
-  ba[--n] = 0;
-  var x = new Array();
-  while(n > 2) { // random non-zero pad
-    x[0] = 0;
-    while(x[0] == 0) x[0] = (parseInt(prng(1)[0], 16) | 1);
-    ba[--n] = x[0];
-  }
-  ba[--n] = 2;
-  ba[--n] = 0;
-  return new BigInteger.fromArray(ba, 256);
-};
-
-const PRIVATE_ENCRYPTED = 128; //BitFlag for cyphts encrypted with a private key.
-
+    return value;
+}
 // Encrypt from public/private key
 function encrypt(inBuffer, key) {
-  let m = pkcs1pad2(inBuffer, (key.n.bitLength()+7) >> 3);
-  if(m == null) return null;
-  let c = key.crypt(m);
-  if(c == null) return null;
-  return new buffer.Buffer.from(c.toArray(256).value);
+  return new Promise( (resolve, reject) => {
+    const m = BigInteger.fromArray([...inBuffer], 256);
+    const c = key.crypt(m);
+    resolve(new buffer.Buffer.from(c.toArray(256).value, 256));
+  });
 }
 
 // Decrypt from private key
 function decrypt(enc, key) {
-  let c = new BigInteger.fromArray([...enc], 256);
-  let m = key.crypt(c);
-  if(m == null) return null;
-  return pkcs1unpad2(m, (key.n.bitLength()+7)>>3);
+  return new Promise( (resolve, reject) => {
+    let c = new BigInteger.fromArray([...enc], 256);
+    let m = key.crypt(c);
+    if(m == null) reject();
+    resolve(new buffer.Buffer.from(m.toArray(256).value, 256));
+  });
 }
 
 const encypht = (original, key) => {
-  console.log('Encrypting with token size', key.options.tokenSize);
-  const password = buffer.Buffer.from(prng(key.options.tokenSize).map( chr => {
-    return chr.toString();
-  }));
-  const omessage = buffer.Buffer.from(original);
-  const encMessage = new buffer.Buffer.from(AesCtr.encrypt(omessage, password, 256));
-  const encPassword = encrypt(password, key);
-  const outLength = encMessage.length + encPassword.length + 1;
-  const lengthToken = key.isPrivate() ? encPassword.length + PRIVATE_ENCRYPTED : encPassword.length;
-  return buffer.Buffer.concat([ buffer.Buffer.from([lengthToken]), encPassword, encMessage ], outLength);
-};
-
-const isPrivateCypht = cypht => {
-  const tokenLength = cypht[0];
-  return (tokenLength > PRIVATE_ENCRYPTED);
+  return new Promise( (resolve, reject) => {
+    const password = key.randomToken();
+    const omessage = buffer.Buffer.from(original);
+    const encMessage = new buffer.Buffer.from(AesCtr.encrypt(omessage, password, 256));
+    encrypt(password, key).then( encPassword => {
+      const outLength = encMessage.length + encPassword.length + 2;
+      const lengthToken = encPassword.length;
+      const lengthBytes = longToByteArray(lengthToken);
+      resolve(buffer.Buffer.concat([ buffer.Buffer.from(lengthBytes), encPassword, encMessage ], outLength));
+    });
+  });
 };
 
 const decypht = (cypht, key) => {
-  let tokenLength;
-  if (isPrivateCypht(cypht)) {
-    tokenLength = (cypht[0] - PRIVATE_ENCRYPTED);
-  } else {
-    tokenLength = cypht[0];
-  }
-  const token = cypht.slice( 1, tokenLength+1 );
-  const pass = decrypt(token, key);
-  const message = cypht.slice(tokenLength+1);
-  const dmessage = AesCtr.decrypt(message, pass, 256);
-  return dmessage;
+  return new Promise( (resolve, reject) => {
+    let tokenLength = byteArrayToLong([cypht[0], cypht[1]]);
+    const token = cypht.slice( 2, tokenLength+2 );
+    decrypt(token, key).then( pass => {
+      const message = cypht.slice(tokenLength+2);
+      const dmessage = AesCtr.decrypt(message, pass, 256);
+      resolve(dmessage);
+    });
+  });
 };
 
 const generateKeys = (options={}) => {
   return new Promise( (resolve, reject) => {
     const privateKey = new CyphtPrivateKey(options);
-    privateKey.generate().then( () => {
+    privateKey.generate().then( success => {
       const publicKey = privateKey.publicKey();
       resolve({
         privateKey,
@@ -535,8 +488,7 @@ const cypht = {
   CyphtPrivateKey,
   CyphtPublicKey,
   encypht,
-  decypht,
-  isPrivateCypht
+  decypht
 };
 
 module.exports = cypht;

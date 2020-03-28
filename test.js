@@ -3,31 +3,33 @@ var cypht = require('./build/index');
 let sizeTestCount = 0;
 
 function sizeTest(message, keys) {
-  const crypted = cypht.encypht(message, keys.publicKey);
-  const decrypted = cypht.decypht(crypted, keys.privateKey).toString();
-  sizeTestCount++;
-  const change = Math.round((crypted.length / message.length) * 100);
-  const isPrivateCypht = cypht.isPrivateCypht(crypted);
-  console.log('Message Size Test #', sizeTestCount ,'From', message.length, 'bytes to', crypted.length,'bytes. A', change,'% change. Private encrypted? ', isPrivateCypht, ' Message : ', decrypted);
+  cypht.encypht(message, keys.publicKey).then( crypted => {
+    cypht.decypht(crypted, keys.privateKey).then( decrypted => {
+      sizeTestCount++;
+      console.log('Message Size Test #', sizeTestCount ,'Overhead', crypted.length - message.length, 'bytes', 'Message :', decrypted.toString());
+    });
+  });
 }
 
+let keySize = process.argv[2] ? parseInt(process.argv[2]) : 128;
 
-console.log('Generating keys');
+console.log('Generating', keySize*8,'bit RSA keys');
 const started = Date.now();
 cypht.generateKeys({
-  keySize: 64
+  keySize
 }).then( keys => {
   console.log('Keys generated in', (Date.now() - started), 'ms');
+  console.log('Prime iterations p=', keys.privateKey.generationIterations[0],'q=',keys.privateKey.generationIterations[1]);
   console.log('Export/Import test');
   const publicKey = new cypht.CyphtPublicKey;
   publicKey.importRaw(keys.publicKey.exportRaw());
   const privateKey = new cypht.CyphtPrivateKey;
   privateKey.importRaw(keys.privateKey.exportRaw());
-  const signPayload = keys.privateKey.randomToken();
-  console.log('Signing test. Payload size:', signPayload.length);
+  const signPayload = publicKey.randomToken();
+  console.log('Signing test. Payload Size:', signPayload.length);
   const signed = privateKey.sign(signPayload);
   console.log('Public key verified:', publicKey.verify(signed, signPayload));
   sizeTest('We strike at dawn', {publicKey, privateKey});
-  sizeTest('The fruitsalad was poisoned', {publicKey, privateKey});
+  sizeTest('The size of the message should not change the overhead when cyphting a message. That all depends on the key size used', {publicKey, privateKey});
   sizeTest('Reverse key test', {publicKey:privateKey, privateKey:publicKey});
 });
