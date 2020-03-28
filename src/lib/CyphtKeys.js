@@ -1,6 +1,10 @@
 import { Buffer } from 'buffer';
 import BigInteger from 'big-integer';
 import prng from './prng';
+import {
+  prng_seed,
+  prng_seeded
+ } from './prng_seeded';
 
 const defaultOptions = {
   expon: 65537,
@@ -25,6 +29,12 @@ class CyphtPublicKey {
     }));
   }
 
+  randomTokenSeeded(seed) {
+    return Buffer.from(prng(seed, this.n.length).map( chr => {
+      return chr.toString();
+    }));
+  }
+
   isPublic() {
     return true;
   }
@@ -40,6 +50,11 @@ class CyphtPublicKey {
   randomToken() {
     const tokenSize = this.n.toArray(256).value.length - 11;
     return Buffer.from(prng(tokenSize > 32 ? 32 : tokenSize).join(''), 'hex');
+  }
+
+  randomTokenSeeded(seed) {
+    const tokenSize = this.n.toArray(256).value.length - 11;
+    return Buffer.from(prng_seeded(seed, tokenSize > 32 ? 32 : tokenSize).join(''), 'hex');
   }
 
   verify(x, target) {
@@ -90,6 +105,11 @@ class CyphtPrivateKey {
     return Buffer.from(prng(tokenSize > 32 ? 32 : tokenSize).join(''), 'hex');
   }
 
+  randomTokenSeeded(seed) {
+    const tokenSize = this.d.toArray(256).value.length - 11;
+    return Buffer.from(prng_seeded(seed, tokenSize > 32 ? 32 : tokenSize).join(''), 'hex');
+  }
+
   publicKey() { //Public Key factory
     return new CyphtPublicKey(this);
   }
@@ -121,27 +141,48 @@ class CyphtPrivateKey {
   }
 
   // Key generation
-  generate() {
+  generate(inToken = null) {
     return new Promise( (resolve, reject) => {
+      let seed = null;
+      if (inToken) {
+        seed = prng_seed(inToken);
+      }
       const qs = this.options.keySize >> 1;
       this.e = parseInt(this.options.expon, 16);
       const ee = new BigInteger(this.options.expon, 16);
       for(;;) {
         for(;;) {
           //Populate a big int with random bytes
-          this.p = new BigInteger(prng(this.options.keySize - qs).join(''), 16);
+          if (seed) {
+            this.p = new BigInteger(prng_seeded(seed, this.options.keySize - qs).join(''), 16);
+          } else {
+            this.p = new BigInteger(prng(this.options.keySize - qs).join(''), 16);
+          }
           while(!this.p.isProbablePrime(this.options.primeCheck)) { //Is this random number prime?
             this.generationIterations[0]++;
-            this.p = new BigInteger(prng(this.options.keySize - qs).join(''), 16);
+            if (seed) {
+              this.p = new BigInteger(prng_seeded(seed, this.options.keySize - qs).join(''), 16);
+            } else {
+              this.p = new BigInteger(prng(this.options.keySize - qs).join(''), 16);
+            }  
           }
           this.p.subtract(BigInteger.one);
           if (BigInteger.gcd(this.p, ee).compareTo(BigInteger.one) === 0 && this.p.isProbablePrime(this.options.primeCheck)) break;
         }
         for(;;) {
-          this.q = new BigInteger(prng(qs).join(''), 16);
+          if (seed) {
+            this.q = new BigInteger(prng_seeded(seed, qs).join(''), 16);
+          } else {
+            this.q = new BigInteger(prng(qs).join(''), 16);
+          }  
+
           while(!this.q.isProbablePrime(this.options.primeCheck)) {
             this.generationIterations[1]++;
-            this.q = new BigInteger(prng(qs).join(''), 16);
+            if (seed) {
+              this.q = new BigInteger(prng_seeded(seed, qs).join(''), 16);
+            } else {
+              this.q = new BigInteger(prng(qs).join(''), 16);
+            }
           }
           this.q.subtract(BigInteger.one);
           if (BigInteger.gcd(this.q, ee).compareTo(BigInteger.one) === 0 && this.q.isProbablePrime(this.options.primeCheck)) break;

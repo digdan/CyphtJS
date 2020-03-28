@@ -71,7 +71,7 @@ const decypht = (cypht, key) => {
 const generateKeys = (options={}) => {
   return new Promise( (resolve, reject) => {
     const privateKey = new CyphtPrivateKey(options);
-    privateKey.generate().then( success => {
+    privateKey.generate(options.seed || null).then( success => {
       const publicKey = privateKey.publicKey();
       resolve({
         privateKey,

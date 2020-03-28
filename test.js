@@ -16,12 +16,14 @@ let keySize = process.argv[2] ? parseInt(process.argv[2]) : 128;
 console.log('Generating', keySize*8,'bit RSA keys');
 const started = Date.now();
 cypht.generateKeys({
-  keySize
+  keySize,
+  //seed: 'andanotheronebitesthedustisagreatsongandihighlysuggestit'
 }).then( keys => {
   console.log('Keys generated in', (Date.now() - started), 'ms');
   console.log('Prime iterations p=', keys.privateKey.generationIterations[0],'q=',keys.privateKey.generationIterations[1]);
   console.log('Export/Import test');
   const publicKey = new cypht.CyphtPublicKey;
+  console.log('Public Key', keys.publicKey.exportRaw().toString('hex'));
   publicKey.importRaw(keys.publicKey.exportRaw());
   const privateKey = new cypht.CyphtPrivateKey;
   privateKey.importRaw(keys.privateKey.exportRaw());
